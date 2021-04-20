@@ -1,0 +1,1 @@
+Place your SDL2 libraries in this folder.
