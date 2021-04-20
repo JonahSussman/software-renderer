@@ -143,6 +143,9 @@ struct IdentityMatrix : Matrix<N, N> {
   }
 };
 
+template<std::size_t N>
+using Vec    = Matrix<N, 1>;
+
 using Vec3   = Matrix<3, 1>;
 using BiVec3 = Matrix<3, 1>;
 using Vec4   = Matrix<4, 1>;
