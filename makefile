@@ -1,14 +1,17 @@
 # 64 bit compilation target
 CC = x86_64-w64-mingw32-g++
+# CC = g++
 # 32 bit compilation target
 # CC = i686-w64-mingw32
 
 CFLAGS = -std=c++17 -O2
 TFLAGS = -std=c++17 -O0 -ggdb -static-libstdc++ -static-libgcc
 LFLAGS = -static-libstdc++ -static-libgcc -lmingw32 -lSDL2main -lSDL2
+# LFLAGS = -static-libstdc++ -static-libgcc -lSDL2main -lSDL2
 
 OBJS = src/main.cpp
 TARGET = bin/software-renderer.exe
+# TARGET = bin/software-renderer
 
 TOBJS = sw_math math_test
 

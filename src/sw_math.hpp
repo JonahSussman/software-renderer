@@ -7,6 +7,14 @@
 
 namespace math {
 
+double lerp(double f_0, double f_1, double x_0, double x_1, double x) {
+  return f_0 + ((x - x_0) / (x_1 - x_0)) * (f_1 - f_0);
+}
+
+double lerp(double f_0, double f_1, double t) {
+  return f_0 + t * (f_1 - f_0);
+}
+
 /**
  * Matrix class with N rows and M columns. Stores type T. Subclasses std::array.
  * 
@@ -37,19 +45,19 @@ struct Matrix : std::array<double, N*M> {
   constexpr auto is_square() { return N == M; }
 
   Matrix<1, M> row(int row) { 
-    Matrix<1, M> result;
+    Matrix<1, M> result{};
     for (int col = 0; col < M; col++) result(col) = (*this)(row, col);
     return result;
   }
 
   Matrix<N, 1> col(int col) {
-    Matrix<N, 1> result;
+    Matrix<N, 1> result{};
     for (int row = 0; row < N; row++) result(row) = (*this)(row, col);
     return result;
   }
 
   Matrix<M, N> transpose() {
-    Matrix<M, N> result;
+    Matrix<M, N> result{};
     for (int row = 0; row < N; row++)
       for (int col = 0; col < M; col++)
         result(col, row) = (*this)(row, col);
@@ -87,10 +95,26 @@ struct Matrix : std::array<double, N*M> {
     for (int i = 0; i < N*M; i++) (*this)[i] /= l;
   }
 
+  Matrix<N, M> normal() {
+    static_assert(
+      N == 1 || M == 1, 
+      "Matrix::normalize() is only valid for 1xM or Nx1 matrices."
+    );
+
+    Matrix<N, M> result = (*this);
+    result.normalize();
+    return result;
+  }
+
   Matrix<N, M> operator+(const Matrix<N, M>& other) const {
     Matrix<N, M> result = *this;
     for (int i = 0; i < N*M; i++) result[i] += other[i];
     return result;
+  }
+
+  Matrix<N, M> operator+=(const Matrix<N, M>& other) {
+    for (int i = 0; i < N*M; i++) (*this)[i] += other[i];
+    return (*this);
   }
 
   Matrix<N, M> operator-(const Matrix<N, M>& other) const {
@@ -113,7 +137,7 @@ struct Matrix : std::array<double, N*M> {
 
   template <std::size_t K>
   auto operator*(const Matrix<M, K>& other) {
-    Matrix<N, K> result;
+    Matrix<N, K> result{};
 
     for (int row = 0; row < N; row++) {
       for (int col = 0; col < K; col++) {
@@ -189,6 +213,8 @@ struct Rotor3 {
    }
   Rotor3(double a, double xy, double xz, double yz) :
     a(a), b({ xy, xz, yz }) { }
+  
+  Rotor3(Vec4 v) : a(v[0]), b({ v[1], v[2], v[3] }) { }
   Rotor3(double a, BiVec3 b) : a(a), b(b) { }
 
   Rotor3(const Vec3& v_from, const Vec3& v_to) {
@@ -204,18 +230,24 @@ struct Rotor3 {
     b[0] = -sin_a * bv_plane[0];
     b[1] = -sin_a * bv_plane[1];
     b[2] = -sin_a * bv_plane[2];
+    // normalize();
   }
 
   Rotor3 operator*(const Rotor3& q) const {
     const Rotor3& p = *this;
     Rotor3 r;
 
-    r.a = p.a * q.a - dot(p.b, q.b);
-    r.b = {
-      p.b[0] * q.a + p.a * q.b[0] + p.b[2] * q.b[1] - p.b[1] * q.b[2],
-      p.b[1] * q.a + p.a * q.b[1] - p.b[2] * q.b[0] + p.b[0] * q.b[2],
-      p.b[2] * q.a + p.a * q.b[2] + p.b[1] * q.b[0] - p.b[0] * q.b[1]
-    };
+    // r.a = p.a * q.a - p.b[0] * p.b[0] - p.b[1] * p.b[1] - p.b[2] * p.b[2];
+    // r.b = {
+    //   p.b[0] * q.a + p.a * q.b[0] + p.b[2] * q.b[1] - p.b[1] * q.b[2],
+    //   p.b[1] * q.a + p.a * q.b[1] - p.b[2] * q.b[0] + p.b[0] * q.b[2],
+    //   p.b[2] * q.a + p.a * q.b[2] + p.b[1] * q.b[0] - p.b[0] * q.b[1]
+    // };
+
+    r.a =    p.a    * q.a - p.b[0] * q.b[0] - p.b[1] * q.b[1] - p.b[2] * q.b[2];
+    r.b[0] = p.b[0] * q.a + p.a    * q.b[0] + p.b[2] * q.b[1] - p.b[1] * q.b[2];
+    r.b[1] = p.b[1] * q.a + p.a    * q.b[1] - p.b[2] * q.b[0] + p.b[0] * q.b[2];
+    r.b[2] = p.b[2] * q.a + p.a    * q.b[2] + p.b[1] * q.b[0] - p.b[0] * q.b[1];
 
     return r;
   }
@@ -239,7 +271,7 @@ struct Rotor3 {
     return r;
   }
 
-  Rotor3 operator*=(const Rotor3& r) {
+  Rotor3& operator*=(const Rotor3& r) {
     (*this) = (*this) * r;
     return *this;
   }
@@ -253,7 +285,8 @@ struct Rotor3 {
   }
 
   double length_squared() const {
-    return a*a + b.length_squared();
+    // return a*a + b.length_squared();
+    return a*a + b[0]*b[0] + b[1]*b[1] + b[2]*b[2];
   }
 
   double length() const {
@@ -298,5 +331,9 @@ struct Rotor3 {
     };
   }
 };
+
+Rotor3 geo(const Vec3& a, const Vec3& b) {
+  return Rotor3(dot(a, b), wedge(a, b));
+}
 
 };
