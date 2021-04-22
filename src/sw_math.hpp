@@ -260,7 +260,7 @@ struct Rotor3 {
       p.a * x[2] - x[0] * p.b[1] - x[1] * p.b[2]
     };
 
-    float q012 = x[0] * p.b[2] - x[1] * p.b[1] + x[2] * p.b[0];
+    double q012 = x[0] * p.b[2] - x[1] * p.b[1] + x[2] * p.b[0];
 
     Vec3 r = {
       p.a * q[0] + q[1] * p.b[0] + q[2] * p.b[1] + q012 * p.b[2],

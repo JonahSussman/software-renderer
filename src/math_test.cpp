@@ -1,4 +1,5 @@
 #include "sw_math.hpp"
+#include "sw_fast_math.hpp"
 
 #include <cmath>
 
@@ -81,50 +82,64 @@ int main() {
   // ROTOR TESTS               //
   ///////////////////////////////
 
-  Vec3 pt = { 1, 0, 0 };
+  // Vec3 pt = { 1, 0, 0 };
 
-  BiVec3 plane = { 1, 0, 0 };
-  plane.normalize();
-  Matrix<4, 4> rm = {
+  // BiVec3 plane = { 1, 0, 0 };
+  // plane.normalize();
+  // Matrix<4, 4> rm = {
+  //   1, 0, 0, 0,
+  //   0, 1, 0, 0,
+  //   0, 0, 1, 0,
+  //   0, 0, 0, 1
+  // };
+  // Rotor3 rtr(plane, plane.length());
+  // /* Works? 
+  // for (int i = 0; i < 1000; i++) {
+  //   rm = rtr.to_matrix4() * rm;
+  //   Vec4 p = rm * Vec4({ pt[0], pt[1], pt[2], 1 });
+  //   cout << p[0] << " " << p[1] << " " << p[2] << endl;
+  // }
+
+  // Rotor3 rot({ 1, 0, 0, 0 });
+  // for (int i = 0; i < 100; i++) {
+  //   rot = rtr.rotate(rot);
+  //   Vec3 p = rot.to_matrix3() * pt;
+  //   cout << p[0] << " " << p[1] << " " << p[2] << endl;
+  // }
+  // */
+
+  // Vec3 v = {
+  //   1, 2, 3
+  // };
+
+  // Vec4 r_0 = { v[0], v[1], v[2], 0 };
+  // for (int i = 0; i < 100; i++) {
+  //   rm = rtr.to_matrix4() * rm;
+  // }
+  // r_0 = rm * r_0;
+
+  // auto r_1 = v;
+  // for (int i = 0; i < 100; i++) r_1 = rtr.rotate(r_1);
+
+  // Rotor3 R;
+  // for (int i = 0; i < 100; i++) R *= rtr;
+  // auto r_2 = R.rotate(v);
+
+  // cout << r_0[0] << " " << r_0[1] << " " << r_0[2] << endl;
+  // cout << r_1[0] << " " << r_1[1] << " " << r_1[2] << endl;
+  // cout << r_2[0] << " " << r_2[1] << " " << r_2[2] << endl;
+
+  /* FAST MATH TESTS */
+
+  fmth::Mat m({
     1, 0, 0, 0,
     0, 1, 0, 0,
     0, 0, 1, 0,
     0, 0, 0, 1
-  };
-  Rotor3 rtr(plane, plane.length());
-  /* Works? 
-  for (int i = 0; i < 1000; i++) {
-    rm = rtr.to_matrix4() * rm;
-    Vec4 p = rm * Vec4({ pt[0], pt[1], pt[2], 1 });
-    cout << p[0] << " " << p[1] << " " << p[2] << endl;
-  }
+  });
 
-  Rotor3 rot({ 1, 0, 0, 0 });
-  for (int i = 0; i < 100; i++) {
-    rot = rtr.rotate(rot);
-    Vec3 p = rot.to_matrix3() * pt;
-    cout << p[0] << " " << p[1] << " " << p[2] << endl;
-  }
-  */
+  auto M = m;
+  auto Mm = M * m;
 
-  Vec3 v = {
-    1, 2, 3
-  };
-
-  Vec4 r_0 = { v[0], v[1], v[2], 0 };
-  for (int i = 0; i < 100; i++) {
-    rm = rtr.to_matrix4() * rm;
-  }
-  r_0 = rm * r_0;
-
-  auto r_1 = v;
-  for (int i = 0; i < 100; i++) r_1 = rtr.rotate(r_1);
-
-  Rotor3 R;
-  for (int i = 0; i < 100; i++) R *= rtr;
-  auto r_2 = R.rotate(v);
-
-  cout << r_0[0] << " " << r_0[1] << " " << r_0[2] << endl;
-  cout << r_1[0] << " " << r_1[1] << " " << r_1[2] << endl;
-  cout << r_2[0] << " " << r_2[1] << " " << r_2[2] << endl;
+  cout << Mm << endl;
 }
