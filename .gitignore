@@ -1,3 +1,7 @@
 lib/SDL2-2.0.14/
 bin/*.exe
+bin/*.html
+bin/*.js
+bin/*.wasm
 obj/
+node_modules/

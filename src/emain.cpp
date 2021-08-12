@@ -1,15 +1,10 @@
-#ifdef _WIN32
-#include <SDL.h>
-#endif
+// This file is ONLY FOR EMSCRIPTEN WASM COMPILATION TARGET.
 
-#ifdef __linux__ 
-#include <SDL2/SDL.h>
-#endif
-
-#ifdef __EMSCRIPTEN__
+// Ideally, we would have a bunch of different #ifdefs (like #ifdef __linux___ 
+// or #ifdef __EMPSCRIPTEN__) and such so that the compilation targets all work 
+// off of the same file. 
 #include <SDL2/SDL.h>
 #include <emscripten.h>
-#endif
 
 #include <cmath>
 #include <cassert>
@@ -25,7 +20,6 @@
 
 #include "sw_fast_math.hpp"
 #include "teapot.hpp"
-
 
 // x86 is little endian, God help you if you try to use this on anything else
 union Color {
@@ -74,7 +68,7 @@ struct Camera {
   fmth::Rot rot; // Rotor (probably useless)
 
   Camera() {
-    pos = { 0, 0, 150, 1 };
+    pos = { 0, 0, 20, 1 };
     vel = { 0, 0, 0, 0 };
     ang = { 0, 0, 0, 0 };
     rmx = fmth::IdentityMat;
@@ -99,8 +93,9 @@ struct Controls {
   bool speed_up;
 
   void update(std::map<int, bool>& keys) {
-    speed_up = keys[SDLK_LSHIFT];
-
+    // speed_up = keys[SDLK_LSHIFT];
+    speed_up = false;
+    
     up    = keys[SDLK_SPACE]  || keys[SDLK_e];
     down  = keys[SDLK_q];
     left  = keys[SDLK_a];
@@ -274,6 +269,8 @@ std::vector<Triangle> load_from_obj(std::string filename) {
   return tris;
 }
 
+// Quick addition to load obj file directly from an std::string. Almost exact
+// duplicate of load_from_obj
 std::vector<Triangle> load_from_str(std::string file) {
   std::vector<Vertex> verts;
   std::vector<Triangle> tris;
@@ -309,150 +306,156 @@ std::vector<Triangle> load_from_str(std::string file) {
   return tris;
 }
 
-int main (int argc, char* argv[]) {
-  const double scale = 2;
-  const int W = 512 / scale, H = 512 / scale;
+const double scale = 2;
+// const int W = 512 / 2;
+// const int H = 512 / 2;
+const int W = 480 / 2;
+const int H = 480 / 2;
 
-  SDL_Window* window = SDL_CreateWindow(
-    "Software Renderer", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
-    W*scale, H*scale, SDL_WINDOW_RESIZABLE
-  );
-  SDL_Renderer* renderer = SDL_CreateRenderer(window, -1, 0);
-  SDL_Texture* texture = SDL_CreateTexture(
-    renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, W, H
-  );
+/* In order for emscripten to do a main loop without the browser freezing, we
+  need to give it a function. This function can take only one parameter, a
+  void*. As such, we can put all of the relevant variables that change from loop
+  to loop in a single "context" struct, pass it into the function as a void*,
+  and reinterpret it inside the function as a EmCtx*.
+ */
+struct EmCtx {
+  SDL_Window* window;
+  SDL_Renderer* renderer;
+  SDL_Texture* texture;
 
-  // auto bitmap = cool_image();
-
-  // Main loop
-  uint64_t curr_time = SDL_GetPerformanceCounter();
-  uint64_t last_time = 0;
-  uint64_t perf_freq = SDL_GetPerformanceFrequency();
-  double dt_ms = 0.0;
-  double dt    = 0.0;
+  uint64_t curr_time;
+  uint64_t last_time;
+  uint64_t perf_freq;
+  double dt_ms;
+  double dt;
 
   Camera camera;
   Controls controls;
 
   std::vector<Triangle> tris;
 
-  if (argc != 1) {
-    tris = load_from_obj(argv[1]);
-  } else {
-    tris = load_from_str(teapot);
-  }
-
-  // Triangle tri1; // xy - red
-  // tri1.v[0].pos = {1.0, 0.0, 0.0, 1.0};
-  // tri1.v[1].pos = {0.0, 1.0, 0.0, 1.0}; 
-  // tri1.v[2].pos = {0.0, 0.0, 0.0, 1.0};
-
-  // Triangle tri2; // xz - blue
-  // tri2.v[0].pos = {1.0, 0.0, 0.0, 1.0};
-  // tri2.v[1].pos = {0.0, 0.0, 1.0, 1.0}; 
-  // tri2.v[2].pos = {0.0, 0.0, 0.0, 1.0};
-
-  // Triangle tri3; // yz - green
-  // tri3.v[0].pos = {0.0, 1.0, 0.0, 1.0};
-  // tri3.v[1].pos = {0.0, 0.0, 1.0, 1.0}; 
-  // tri3.v[2].pos = {0.0, 0.0, 0.0, 1.0};
-
-  int count = 20;
+  int count;
 
   std::map<int, bool> keys;
-  while(!keys[SDLK_ESCAPE]) {
-    last_time = curr_time;
-    curr_time = SDL_GetPerformanceCounter();
-    perf_freq = SDL_GetPerformanceFrequency();
-    dt_ms = (double)((curr_time - last_time) * 1000 / (double)perf_freq);
-    dt    = dt_ms / 1000.0;
+};
 
-    SDL_Event ev;
-    while(SDL_PollEvent(&ev)) {
-      switch(ev.type) {
-        case SDL_QUIT:    keys[SDLK_ESCAPE] = true; break;
-        case SDL_KEYDOWN: keys[ev.key.keysym.sym] = true; break;
-        case SDL_KEYUP:   keys[ev.key.keysym.sym] = false; break;
-      }
-    }
+/* Main loop function with the reinterpret cast mentioned earlier */
+void main_loop(void* arg) {
+  struct EmCtx* e = (EmCtx*)arg;
 
-    controls.update(keys);
-
-    PixelData px(W, H);
-    double zbf[W*H] = { 0.0 };
-
-    // Camera transformations
-    // 
-    fmth::Vec d_ang = {
-      (double)(controls.xy - controls.yx), // xy
-      (double)(controls.xz - controls.zx), // xz
-      (double)(controls.yz - controls.zy), // yz
-      0.0
-    };
-    
-    camera.ang = 0.5 * camera.ang + 0.5 * d_ang;
-
-    // Through the magic of Geometric Algebra, rotation is a one-liner!
-    if (auto rlen = camera.ang.length(); rlen > 0.0001) {
-      auto m = fmth::Rot(camera.ang.normalized(), rlen*0.03).matrix();
-      camera.rmx = m * camera.rmx;
-    }
-
-    fmth::Vec d_vel = {
-      0.1 * (double)(controls.right - controls.left),
-      0.1 * (double)(controls.up    - controls.down),
-      0.1 * (double)(controls.back   - controls.fwd), // Into the screen is -z
-      0.0
-    };
-
-    if (controls.speed_up) d_vel *= 10;
-
-    // Back into world space
-    camera.vel  = camera.rmx.transpose() * d_vel;
-    camera.pos += camera.vel;
-
-    const bool debug = false;
-    if constexpr (debug) {
-      if (++count >= 20) {
-        count = 0;
-        std::cout << "POS: " << camera.pos << std::endl;
-        std::cout << "VEL: " << camera.vel << std::endl;
-        std::cout << "RMX:\n";
-        std::cout << camera.rmx << std::endl;
-      }
-    }
-
-    for (Triangle tri : tris) {
-      auto a1 = unnormalize_coords(&px, perspective_project(camera.rmx * (tri.v[0].pos - camera.pos)));
-      auto b1 = unnormalize_coords(&px, perspective_project(camera.rmx * (tri.v[1].pos - camera.pos)));
-      auto c1 = unnormalize_coords(&px, perspective_project(camera.rmx * (tri.v[2].pos - camera.pos)));
-      rasterize_triangle(&px, zbf, a1, b1, c1, tri.temp_color);
-    }
-
-    // auto a1 = unnormalize_coords(&px, perspective_project(camera.rmx * (tri1.v[0].pos - camera.pos)));
-    // auto b1 = unnormalize_coords(&px, perspective_project(camera.rmx * (tri1.v[1].pos - camera.pos)));
-    // auto c1 = unnormalize_coords(&px, perspective_project(camera.rmx * (tri1.v[2].pos - camera.pos)));
-    // // if (!(a1.x < 0 || a1.x > W-1 || a1.y < 0 || a1.y > H-1 || b1.x < 0 || b1.x > W-1 || b1.y < 0 || b1.y > H-1 || c1.x < 0 || c1.x > W-1 || c1.y < 0 || c1.y > H-1))
-    // rasterize_triangle(&px, zbf, a1, b1, c1, 0xff0000);
-
-    // auto a2 = unnormalize_coords(&px, perspective_project(camera.rmx * (tri2.v[0].pos - camera.pos)));
-    // auto b2 = unnormalize_coords(&px, perspective_project(camera.rmx * (tri2.v[1].pos - camera.pos)));
-    // auto c2 = unnormalize_coords(&px, perspective_project(camera.rmx * (tri2.v[2].pos - camera.pos)));
-    // // if (!(a2.x < 0 || a2.x > W-1 || a2.y < 0 || a2.y > H-1 || b2.x < 0 || b2.x > W-1 || b2.y < 0 || b2.y > H-1 || c2.x < 0 || c2.x > W-1 || c2.y < 0 || c2.y > H-1))
-    // rasterize_triangle(&px, zbf, a2, b2, c2, 0x00ff00);
-
-    // auto a3 = unnormalize_coords(&px, perspective_project(camera.rmx * (tri3.v[0].pos - camera.pos)));
-    // auto b3 = unnormalize_coords(&px, perspective_project(camera.rmx * (tri3.v[1].pos - camera.pos)));
-    // auto c3 = unnormalize_coords(&px, perspective_project(camera.rmx * (tri3.v[2].pos - camera.pos)));
-    // // if (!(a3.x < 0 || a3.x > W-1 || a3.y < 0 || a3.y > H-1 || b3.x < 0 || b3.x > W-1 || b3.y < 0 || b3.y > H-1 || c3.x < 0 || c3.x > W-1 || c3.y < 0 || c3.y > H-1))
-    // rasterize_triangle(&px, zbf, a3, b3, c3, 0x0000ff);
-
-    SDL_UpdateTexture(texture, nullptr, px.px, 4*W);
-    SDL_RenderCopy(renderer, texture, nullptr, nullptr);
-    SDL_RenderPresent(renderer);
-
-    SDL_Delay(1000/60);
+  if (e->keys[SDLK_ESCAPE]) {
+    emscripten_cancel_main_loop();
+    return;
   }
+
+  e->last_time = e->curr_time;
+  e->curr_time = SDL_GetPerformanceCounter();
+  e->perf_freq = SDL_GetPerformanceFrequency();
+  e->dt_ms = (double)((e->curr_time - e->last_time) * 1000 / (double)e->perf_freq);
+  e->dt    = e->dt_ms / 1000.0;
+
+  SDL_Event ev;
+  while(SDL_PollEvent(&ev)) {
+    switch(ev.type) {
+      case SDL_QUIT:    e->keys[SDLK_ESCAPE] = true; break;
+      case SDL_KEYDOWN: e->keys[ev.key.keysym.sym] = true; break;
+      case SDL_KEYUP:   e->keys[ev.key.keysym.sym] = false; break;
+    }
+  }
+
+  e->controls.update(e->keys);
+
+  PixelData px(W, H);
+  double zbf[W*H] = { 0.0 };
+
+  // Camera transformations
+  fmth::Vec d_ang = {
+    (double)(e->controls.xy - e->controls.yx), // xy
+    (double)(e->controls.xz - e->controls.zx), // xz
+    (double)(e->controls.yz - e->controls.zy), // yz
+    0.0
+  };
+  
+  e->camera.ang = 0.5 * e->camera.ang + 0.5 * d_ang;
+
+  // Through the magic of Geometric Algebra, rotation is a one-liner!
+  if (auto rlen = e->camera.ang.length(); rlen > 0.0001) {
+    auto m = fmth::Rot(e->camera.ang.normalized(), rlen*0.03).matrix();
+    e->camera.rmx = m * e->camera.rmx;
+  }
+
+  fmth::Vec d_vel = {
+    0.1 * (double)(e->controls.right  - e->controls.left),
+    0.1 * (double)(e->controls.up     - e->controls.down),
+    0.1 * (double)(e->controls.back   - e->controls.fwd), // Into the screen is -z
+    0.0
+  };
+
+  if (e->controls.speed_up) d_vel *= 10;
+
+  // Back into world space
+  e->camera.vel  = e->camera.rmx.transpose() * d_vel;
+  e->camera.pos += e->camera.vel;
+
+  const bool debug = false;
+  if constexpr (debug) {
+    if (++(e->count) >= 20) {
+      e->count = 0;
+      std::cout << "POS: " << e->camera.pos << std::endl;
+      std::cout << "VEL: " << e->camera.vel << std::endl;
+      std::cout << "RMX:\n";
+      std::cout << e->camera.rmx << std::endl;
+    }
+  }
+
+  for (Triangle tri : e->tris) {
+    auto a1 = unnormalize_coords(&px, perspective_project(e->camera.rmx * (tri.v[0].pos - e->camera.pos)));
+    auto b1 = unnormalize_coords(&px, perspective_project(e->camera.rmx * (tri.v[1].pos - e->camera.pos)));
+    auto c1 = unnormalize_coords(&px, perspective_project(e->camera.rmx * (tri.v[2].pos - e->camera.pos)));
+    rasterize_triangle(&px, zbf, a1, b1, c1, tri.temp_color);
+  }
+
+  SDL_UpdateTexture(e->texture, nullptr, px.px, 4*W);
+  SDL_RenderCopy(e->renderer, e->texture, nullptr, nullptr);
+  SDL_RenderPresent(e->renderer);
+
+  SDL_Delay(1000/60);
+}
+
+int main (int argc, char* argv[]) {
+  EmCtx e; // The EmCtx struct we pass into main_loop()
+
+  // e.scale = 2;
+  // W = 512 / e.scale;
+  // H = 512 / e.scale;
+
+  e.window = SDL_CreateWindow(
+    "Software Renderer", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
+    W*scale, H*scale, SDL_WINDOW_RESIZABLE
+  );
+  e.renderer = SDL_CreateRenderer(e.window, -1, 0);
+  e.texture = SDL_CreateTexture(
+    e.renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, W, H
+  );
+
+  // auto bitmap = cool_image();
+
+  // Main loop
+  e.curr_time = SDL_GetPerformanceCounter();
+  e.last_time = 0;
+  e.perf_freq = SDL_GetPerformanceFrequency();
+  e.dt_ms = 0.0;
+  e.dt    = 0.0;
+
+  e.camera = Camera();
+  e.controls = Controls();
+  e.tris = (argc != 1) ? load_from_obj(argv[1]) : load_from_str(teapot);
+
+  e.count = 20;
+
+  e.keys = std::map<int, bool>();
+
+  emscripten_set_main_loop_arg(main_loop, &e, -1, 1);
 
   return 0;
 }

@@ -1,5 +1,7 @@
 {
   "files.associations": {
+    "*.html": "html",
+    "*.njk": "html",
     "array": "cpp",
     "atomic": "cpp",
     "*.tcc": "cpp",
@@ -44,6 +46,12 @@
     "cinttypes": "cpp",
     "typeinfo": "cpp",
     "ctime": "cpp",
-    "iomanip": "cpp"
+    "iomanip": "cpp",
+    "chrono": "cpp",
+    "condition_variable": "cpp",
+    "cstring": "cpp",
+    "ratio": "cpp",
+    "mutex": "cpp",
+    "thread": "cpp"
   }
 }

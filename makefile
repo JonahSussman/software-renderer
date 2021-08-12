@@ -29,6 +29,13 @@ all: $(OBJS)
 tests:
 	$(CC) $(TFLAGS) src/math_test.cpp -o $(TTARGET)
 
+webhtml:
+	em++ src/emain.cpp --shell-file src/html_shell.html -O3 -std=c++17 -o bin/software-renderer.html -s WASM=1 -s NO_EXIT_RUNTIME=0 -s USE_SDL=2
+
+# -s USE_SDL=2 -s USE_SDL_IMAGE=2
+# em++ src/emain.cpp -O2 -o  bin/software-renderer.html -s USE_SDL=2 
+# -s FORCE_FILESYSTEM=1 -s EXIT_RUNTIME=1
+
 # tests: $(TOBJS)
 # 	$(CC) $(addsuffix .o, $(addprefix obj/, $(TOBJS))) $(INCLUDE_PATHS) $(LIBRARY_PATHS) $(TFLAGS) $(LFLAGS) -o $(TTARGET)
 
